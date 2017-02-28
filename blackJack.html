@@ -1,0 +1,635 @@
+<HTML>
+<HEAD>
+	<META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=utf-8">
+	<TITLE>Blackjack by Harrison Wainwright</TITLE>
+
+	<SCRIPT LANGUAGE="JavaScript">
+/* 
+CS316 program 1
+Initial Author: Paul Piwowarski 2014/09
+Modifications: Paul Linton 2016/09
+
+Student Name: Harrison Wainwright 2016/10
+
+Winning percentage for automated run after 10,000 runs: 51.81%
+
+Example code to start Program 1
+*/
+//****************************** GLOBAL VARIABLES ***********************************************
+// DSIZE is size of deck: 52 for normal deck
+// Note: do not hardcode deck size. Use this variable
+// to simplify my (and your) testing
+var DSIZE = 52; // size of deck
+var card = new Array(DSIZE); // shuffled deck
+var cardstart = new Array(DSIZE); // starting deck in order
+var cc; // index into card array during play
+var dealpressed = 0;   // deal button has been pressed
+var userTotal = 0; // User total.
+var dealerTotal = 0; // Dealer total.
+var winTotal = 0; // Win total.
+var lossTotal = 0; // Loss total.
+var gameComplete = false; // Keeps track of whether game is over or not.
+var isRun1000 = false; // Whether auto run 1000 is pressed.
+var drawCard = true; // Whether more cards should be drawn by user.
+
+shuffle();   // start with new deal
+
+// shuffle
+// This is one way to create a shuffled deck
+// reshuffle the cards, put in card array
+// Preconditions:
+//	New Deal button pressed
+// Postconditions:
+//	Card array filled and shuffled
+function shuffle() {  
+	
+	if (dealpressed != 0) // If user is in middle of play, prevent them from reshuffling the deck.
+	{
+		alert("Cannot reshuffle deck during play. Press shuffle after 'Stay'.");
+		return;
+	}
+
+	// cardstart is unshuffled 1,2,3....
+	// card 1 is ace of clubs (1.png)
+	// card 2 is ace of spades (2.png)
+	// card 52 is 2 of diamonds (52.png)
+	for (var i = 0; i < DSIZE;i++) {
+		cardstart[i] = i+1;
+	}
+	// select card randomly from cardstart and put in card
+	var randcard; // randomly selected card 
+	for (var j = 0; j < DSIZE; j++) {
+		randcard = Math.round(Math.random() * (DSIZE - j - 1)); // choose card
+		card[j] = cardstart[randcard]; // store random card
+		cardstart.splice(randcard, 1); // pack array
+	}  
+	cc = 0;              // index into card array
+
+	if (gameComplete && isRun1000 == false) // Tell user of shuffle after click and if auto run is not running.
+	{
+		alert("Deck has been reshuffled."); // Inform user of shuffle.
+	}
+}
+
+// resetdata
+// reset all variables, screen fields to start fresh
+function resetdata() {
+
+	// Reset variables.
+	dealpressed = 0;
+	userTotal = 0;
+	dealerTotal = 0;
+	isRun1000 = false;
+	shuffle();
+	
+	// Reset value boxes.
+	document.JForm.winning.value = 100;
+	document.JForm.myresult.value = 0;
+	document.JForm.opscore.value = 0;
+	document.JForm.myscore.value = 0;
+
+	// Remove image source to remove the image from the webpage.
+	document.getElementById("dlcards").innerHTML = "";
+	document.getElementById("mycards").innerHTML = "";
+
+}
+
+// calculate
+// calculate value of card
+// Preconditions:
+//	Card passed
+//	1 <= card <= 52
+// Postconditions:
+//	Card value returned
+function calculate(card) {
+var value; // numerical value of card
+	if (card <= 4) {    // ace
+		value = 11;
+		return value; 
+	}
+	if (card <= 20) {   // face card or 10
+		value = 10;
+		return value;
+	}
+	if (card <= 24) {  // 9, and so forth
+		value = 9;
+		return value;
+	}    
+	if (card <= 28) {
+		value = 8;
+		return value;
+	}      
+	if (card <= 32) {
+		value = 7;
+		return value;
+	}    
+	if (card <= 36) {
+		value = 6;
+		return value;
+	}    
+	if (card <= 40) {
+		value = 5;
+		return value;
+	}    
+	if (card <= 44) {
+		value = 4;
+		return value;
+	}    
+	if (card <= 48) {
+		value = 3;
+		return value;
+	}   
+	value = 2;          // only 2 left
+	return value; 
+}
+
+// getcard
+// get card from cardstart, then remove from deck
+function getcard() {
+    var cardPull;
+    cardPull = card[cc++];
+    return cardPull;
+}
+
+// run 1000 times
+function run1000() {
+    var i;
+    isRun1000 = true;
+
+    // Reset values to ensure they are taken care of before first run.
+    dealpressed = 0;
+    userTotal = 0;
+    dealerTotal = 0;
+
+    for (i=0;i<1000;i++) {
+ 
+      shuffle();   // start with shuffled deck
+      
+      deal();      // then deal 
+   
+      while (drawCard) // Keep drawing cards, if the hit function returns says to.
+      {
+          drawCard = hit(userTotal, dealerTotal);
+	  
+	  if (drawCard) // If you need to draw another card for user, do so.
+	  {
+		mycard1number = getcard();
+                userTotal += calculate(mycard1number);
+
+		if (mycard1number >= 1 && mycard1number <= 4) // Check to see if card is an ace.
+		{
+			if (userTotal > 21) // If causes a bust, make the ace a 1.
+			{
+				userTotal = userTotal - 10;
+			}
+		}
+	  }
+      }
+
+      drawCard = true; // Set drawCard back to true for next run. 
+
+      run();       // then run
+    }   
+
+    // when done, update the screen
+    document.JForm.winning.value = (winTotal / (winTotal + lossTotal)) * 100;
+
+    isRun1000 = false; // Set value back to false so user version can be used if needed.
+
+}
+ 
+// hit
+// Determine whether to take one more card
+// Preconditions:
+//    playerhand - array of card values
+//	dealerhand - array of card values
+// Postconditions:
+//    returns true: take another card
+//            false: do not take card
+//    For the input cards (playerhand[], dealerhand[])
+//    ace  11
+//    face card 10
+//    all others their value 
+function hit(playerhand, dealerhand) {
+
+	if (playerhand >= 21) // If the user has 21 or more, they don't need to hit since they have won or busted.
+	{
+		return false;
+	}
+
+	if (dealerhand >= 17 && dealerhand < 21) // If user has between 17 and 21 draw accordingly
+	{
+		if (playerhand <= 11)
+		{
+			return true;
+		}
+		else if (playerhand >= 12 && playerhand <= 16)
+		{
+			return true;
+		}
+		else if (playerhand >= 17 && playerhand < 21) // If the user and dealer have between 17 and 21, check the values further.
+		{
+			if (playerhand == dealerhand) // If the two have value, a tie should occur so return false.
+			{
+				return false;
+			}
+			else if (playerhand > dealerhand) // If user already has more return false to ensure win.
+			{
+				return false;
+			}
+			else if (playerhand < dealerhand) // If user has less than dealer and dealer isn't moving, take a hit.
+			{
+				return true;
+			}
+		}
+	}
+	else if (dealerhand >= 12 && dealerhand <= 16) // If user has between 12 and 16 draw accordingly
+	{
+		if (playerhand <= 11)
+                {
+                        return true;
+                }
+                else if (playerhand >= 12 && playerhand <= 16)
+                {
+                	return true;
+		}
+                else if (playerhand >= 17 && playerhand < 21)
+                {
+                        return false;
+                }
+	}
+	else if (dealerhand == 10) // If user has 10 draw accordingly
+	{
+		if (playerhand <= 11)
+		{
+                        return true;
+		}
+		else if (playerhand >= 12 && playerhand <= 16)
+		{
+                        return true;
+		}
+		else if (playerhand >= 17 && playerhand < 21)
+		{
+			return false;
+		}
+	}
+	else if (dealerhand >= 7 || dealerhand <= 9) // If user has between 7 and 9 draw accordingly
+	{
+		if (playerhand <= 11)
+		{
+                        return true;
+		}
+		else if (playerhand >= 12 && playerhand <= 16)
+		{
+                        return true;
+		}
+		else if (playerhand >= 17 && playerhand < 21)
+		{
+			return false;
+		}
+	}
+	else if (dealerhand >= 2 || dealerhand <= 6) // If user has between 2 and 6 draw accordingly
+	{
+                if (playerhand <= 11)
+                {
+                        return true;
+                }
+                else if (playerhand >= 12 && playerhand <= 16)
+                {
+			return false;
+                }
+                else if (playerhand >= 17 && playerhand < 21)
+                {
+			return false;
+                }
+	}
+}
+
+
+// run
+// after deal, determine whether to take card or not
+// Preconditions:
+//	Deal button pressed
+// Postconditions:
+//	Game completed
+//	Results displayed 
+function run() {
+
+	if (gameComplete)
+	{
+		alert("User already clicked 'Stay', please hit 'Deal/Hit' to play again.");
+	}
+	
+	else if (dealpressed != 0) // Ensure that deal button was pressed at least one time.
+	{
+		dealpressed = 0; // Set dealpressed back to zero to allow 'Shuffle' to be pressed after run is complete.
+
+		if (userTotal > 21) // If user has busted, give them a loss and continue.
+		{
+			lossTotal += 1;
+			gameComplete = true;
+
+			if (isRun1000 == false) // If this run result was reached by interactivity, inform user accordingly.
+			{
+				alert("You lost, press 'Deal/Hit' to play again"); // Inform user of loss and tell them how to play again.
+				document.JForm.winning.value = (winTotal / (winTotal + lossTotal)) * 100;
+				document.JForm.myresult.value = "LOSS";
+			}
+			return;
+		}
+
+		if (dealerTotal < 17) // If the dealer has a total less than 17, dealer draws a card.
+		{
+			while (dealerTotal < 17) // While the dealer is under the 'soft 17', make them continue hitting until they are over the value.
+			{
+				dlcardnumber = getcard();
+				dlcard1 = "<img src = '"+dlcardnumber+".png' />";
+				dlcards += dlcard1;
+				dealerTotal += calculate(dlcardnumber);
+				
+				if ((dlcardnumber >= 1 && dlcardnumber <= 4)) // If the value drawn is an ace check to see if it causes a bust.
+				{
+					if (dealerTotal > 21) // If it causes a bust, make the ace a 1 by taking away 10 from the total.
+					{
+						dealerTotal = dealerTotal - 10;
+					}
+				}
+
+			}
+		}
+			
+		if (isRun1000 == false) // If you are not running with the automation, inform the user of dealer's values.
+		{
+			if (dealerTotal <=  21) // Display the dealer's total and inform of bust if applicable.
+        		{
+                		document.JForm.opscore.value = dealerTotal;
+        		}
+        		else
+        		{
+        	      		document.JForm.opscore.value = "BUST";
+        		}
+		}
+		
+		if (dealerTotal > 21) // If dealer has busted, inform user accordingly and reward the user with a win.
+		{
+			winTotal += 1;
+			gameComplete = true;
+	
+			if (isRun1000 == false)
+			{
+				alert("You won! Press 'Deal/Hit' to play again"); // Inform user of win and tell them how to play again.
+				
+				document.JForm.winning.value = (winTotal / (winTotal + lossTotal)) * 100;
+                               	document.JForm.myresult.value = "WIN";
+				document.getElementById("dlcards").innerHTML = dlcards;
+			}
+		}
+		
+		if (dealerTotal >= 17 && dealerTotal <= 21) // Dealer didn't bust, so deal with win, loss, or tie, accordingly.
+		{
+			if (dealerTotal > userTotal) // If user has less than the dealer give them a loss.
+			{
+				lossTotal += 1;
+				gameComplete = true;
+	
+				if (isRun1000 == false)
+				{
+					alert("You lost, press 'Deal/Hit' to play again"); // Inform user of loss and tell them how to play again.
+					document.JForm.winning.value = (winTotal / (winTotal + lossTotal)) * 100;
+					document.getElementById("dlcards").innerHTML = dlcards; 
+					document.JForm.myresult.value = "LOSS";
+				}
+			}
+			else if (userTotal > dealerTotal) // If user has more than the dealer give them a win.
+			{
+				winTotal += 1;
+	                        gameComplete = true;
+        
+	                        if (isRun1000 == false)
+	                        {
+	                                alert("You won! Press 'Deal/Hit' to play again"); // Inform user of win and tell them how to play again.
+
+					document.JForm.winning.value = (winTotal / (winTotal + lossTotal)) * 100;
+					document.getElementById("dlcards").innerHTML = dlcards; 
+         	      	        	document.JForm.myresult.value = "WIN";
+              		      	}
+
+			}
+			else if (userTotal == dealerTotal) // If user and dealer tie then give user a win.
+			{
+				winTotal += 1;
+				gameComplete = true; // Change gameComplete value and don't add to win or loss due to tie.
+
+				if (isRun1000 == false)
+				{
+					alert("You tied, press 'Deal/Hit' to play again"); // Inform user of result and tell them how to play again.
+				
+					document.JForm.winning.value = (winTotal / (winTotal + lossTotal)) * 100;
+                                        document.JForm.myresult.value = "TIE";
+					document.getElementById("dlcards").innerHTML = dlcards;
+				}
+			}
+		}
+	}
+	else
+	{
+		alert("'Deal/Hit' must be pressed before 'Stay'."); // Inform user they need to deal before staying.
+	}
+}
+
+// deal
+// start by dealing 2 cards to opponent and you
+// If cards have been dealt deal one more card to user
+// Display the values of user and dealer
+// Preconditions:
+//	N/A
+// Postconditions:
+//	dealt cards
+//	printed totals
+function deal() {
+
+	var dlcard1
+	var dlcard2
+	var mycard1
+	var mycard2
+
+	if (gameComplete == true) // Game was previously completed to set dealpressed to zero to allow replay.
+	{
+		gameComplete = false;
+		dealpressed = 0;
+		userTotal = 0;
+		dealerTotal = 0;
+	}
+
+	if (cc > 41 && dealpressed == 0) // If the remaining cards is 6 or less and there is a new play then reshuffle.
+	{
+		alert("Too few cards left in deck. Deck was automatically reshuffled.");
+		shuffle();
+	}
+	
+	if (userTotal >= 21 && isRun1000 == false) // If the user has busted, inform them and force them to click "Stay".
+	{
+		alert("User already busted, click 'Stay'"); //Alert user of having busted and return without drawing card.
+		return;
+	}
+
+	dealpressed += 1; // deal button has been pressed
+
+	if (dealpressed == 1) // draw two cards for each player
+	{
+		dlcard1number = card[cc++];
+		dlcard2number = card[cc++];
+		mycard1number = card[cc++];
+		mycard2number = card[cc++];
+		dlcard1 = "<img src = '"+dlcard1number+".png' />";
+		dlcard2 = "<img src = '"+dlcard2number+".png' />";
+		dlcards = dlcard1 + dlcard2;
+		mycard1 = "<img src = '"+mycard1number+".png' />";
+		mycard2 = "<img src = '"+mycard2number+".png' />";
+		mycards = mycard1 + mycard2;
+		userTotal += calculate(mycard1number);
+		userTotal += calculate(mycard2number);
+		dealerTotal += calculate(dlcard1number);
+		dealerTotal += calculate(dlcard2number);
+
+		if (isRun1000 == true) // If run was pressed, return to avoid values being displayed.
+		{
+			if ((mycard1number >= 1 && mycard1number <= 4) || (mycard2number >= 1 && mycard2number <= 4)) // If the value added is an ace, further investigate total.
+        		{
+                		if (userTotal > 21) // If values added make the user total go over 21 and there is an ace, take off 10 to make the ace worth 1 not 11.
+                		{
+                        		userTotal = userTotal - 10;
+                		}
+        		}
+			return;
+		}
+	}
+	else // If initial deal has been given only give user one card.
+	{
+		mycard1number = getcard();
+		mycard1 = "<img src = '" + mycard1number + ".png' />";
+		mycards += mycard1;
+		userTotal += calculate(mycard1number);
+	}
+    
+	if ((mycard1number >= 1 && mycard1number <= 4) || (mycard2number >= 1 && mycard2number <= 4)) // If the value added is an ace, further investigate total.
+	{
+		if (userTotal > 21) // If values added make the user total go over 21 and there is an ace, take off 10 to make the ace worth 1 not 11.
+		{
+			userTotal = userTotal - 10;
+		}
+	}
+	
+	if ((dlcard1number >= 1 && dlcard1number <= 4) || (dlcard2number >= 1 && dlcard2number <= 4)) // If the value added is an ace, further investigate total.
+        {
+                if (dealerTotal > 21) // If values added make the dealer total go over 21 and there is an ace, take off 10 to make the ace worth 1 not 11.
+                {
+                        dealerTotal = dealerTotal - 10;
+                }
+        }
+	
+	document.JForm.opscore.value = dealerTotal; // Display dealer's total.
+
+	if (userTotal <=  21) // Display the user's total and inform of bust if applicable.
+	{
+    		document.JForm.myscore.value = userTotal;
+	}
+	else
+	{
+		document.JForm.myscore.value = "BUST";
+	}
+
+    	// Display cards on screen
+    	document.getElementById("dlcards").innerHTML = dlcards; 
+	document.getElementById("mycards").innerHTML = mycards;
+	
+}
+
+</SCRIPT>
+
+</HEAD>
+<BODY >
+<FORM NAME="JForm">
+<CENTER>
+	<TABLE CELLPADDING=2 CELLSPACING=2 STYLE="page-break-before: always">
+		<TR>
+			<TH STYLE="border: none; padding: 0in">
+				<P>New deal</P>
+			</TH>
+			<TH STYLE="border: none; padding: 0in">
+				<P><INPUT TYPE=BUTTON VALUE="Shuffle" STYLE="width: 1.08in; height: 0.4in" ONCLICK="shuffle();"> </P>
+			</TH>
+			<TH STYLE="border: none; padding: 0in">
+				<P>Reset</P>
+			</TH>
+			<TH STYLE="border: none; padding: 0in">
+				<P><INPUT TYPE=BUTTON VALUE="Reset" STYLE="width: 0.75in; height: 0.4in" ONCLICK="resetdata();"> </P>
+			</TH>
+		</TR>		<!-- row 1 -->
+		<TR>
+			<TH STYLE="border: none; padding: 0in">
+				<P>Dealer score: </P>
+			</TH>
+			<TH STYLE="border: none; padding: 0in">
+				<P><INPUT TYPE=TEXT NAME="opscore" VALUE="0" SIZE=5 STYLE="width: 0.51in; height: 0.31in"> </P>
+			</TH>
+			<TH STYLE="border: none; padding: 0in">
+				<P>My score: </P>
+			</TH>
+			<TH STYLE="border: none; padding: 0in">
+				<P><INPUT TYPE=TEXT NAME="myscore" VALUE="0" SIZE=5 STYLE="width: 0.51in; height: 0.31in"> </P>
+			</TH>
+			<TD COLSPAN=2 VALIGN=TOP STYLE="border: none; padding: 0in"></TD>
+		</TR>		<!-- row 2 -->
+		<TR>
+			<TH STYLE="border: none; padding: 0in">
+				<P>Win/Loss?: </P>
+			</TH>
+			<TH STYLE="border: none; padding: 0in">
+				<P><INPUT TYPE=TEXT NAME="myresult" VALUE="0" SIZE=5 STYLE="width: 0.51in; height: 0.31in"> </P>
+			</TH>
+<!--			<TD COLSPAN=2 VALIGN=TOP STYLE="border: none; padding: 0in"></TD>  -->
+			<TH STYLE="border: none; padding: 0in">
+				<P>My win %: </P>
+			</TH>
+			<TH STYLE="border: none; padding: 0in"> 
+				<P><INPUT TYPE=TEXT NAME="winning" VALUE="100" SIZE=5 STYLE="width: 0.51in; height: 0.31in"> </P>
+			</TH>
+		
+			<TH STYLE="border: none; padding: 0in"></TH>
+			<TD VALIGN=TOP STYLE="border: none; padding: 0in"></TD>
+		</TR>		<!-- row 3 -->
+		<TR>
+			<TH STYLE="border: none; padding: 0in">
+				<P>Deal/Hit</P> 
+			</TH>
+			<TH STYLE="border: none; padding: 0in">
+				<P><INPUT TYPE=BUTTON VALUE="Deal/Hit" STYLE="width: 0.64in; height: 0.4in" ONCLICK="deal();"> </P>
+			</TH>
+			<TH STYLE="border: none; padding: 0in">
+				<P>Stay</P> 
+			</TH>
+			<TH STYLE="border: none; padding: 0in">
+				<P><INPUT TYPE=BUTTON VALUE="Stay" STYLE="width: 0.59in; height: 0.4in" ONCLICK="run();"> </P>
+			</TH>
+			<TH STYLE="border: none; padding: 0in"> 
+				<P>Run 1000 times</P>
+			</TH>
+			<TH STYLE="border: none; padding: 0in">
+				<P><INPUT TYPE=BUTTON VALUE="Run" STYLE="width: 0.59in; height: 0.4in" ONCLICK="run1000();"> </P>
+			</TH>
+		</TR>		<!-- row 4 -->
+	</TABLE>
+</CENTER>
+</FORM>
+<h2 align=center>Dealer's Cards</h2>
+<div id="dlcards" align=center> 
+	<h2  align=center></h2>
+</div>
+<h2  align=center> My Cards</h2>
+<div id="mycards" align=center >
+	<h2 class="WESTERN" align=center></h2>
+</div>
+
+</BODY>
+</HTML>
